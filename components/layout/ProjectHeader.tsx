@@ -22,13 +22,15 @@ export default function ProjectHeader({
   const pathname = usePathname()
 
   const tabs: Tab[] = [
-    { label: 'Overview', href: `/projects/${projectId}` },
+    { label: 'Overview', href: `/projects/${projectId}/overview` },
     { label: 'List', href: `/projects/${projectId}/list` },
     { label: 'Board', href: `/projects/${projectId}/board` },
     { label: 'Timeline', href: `/projects/${projectId}/timeline` },
     { label: 'Calendar', href: `/projects/${projectId}/calendar` },
     { label: 'Dashboard', href: `/projects/${projectId}/dashboard` },
     { label: 'Messages', href: `/projects/${projectId}/messages` },
+    { label: 'Workflow', href: `/projects/${projectId}/workflow` },
+    { label: 'Files', href: `/projects/${projectId}/files` },
   ]
 
   return (
@@ -45,10 +47,7 @@ export default function ProjectHeader({
       {/* Tabs */}
       <nav className="flex items-end gap-0 px-6" aria-label="Project tabs">
         {tabs.map((tab) => {
-          const isActive =
-            tab.href === `/projects/${projectId}`
-              ? pathname === tab.href
-              : pathname.startsWith(tab.href)
+          const isActive = pathname.startsWith(tab.href)
 
           return (
             <Link
