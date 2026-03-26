@@ -1,0 +1,247 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users    User[]
+  projects Project[]
+}
+
+model User {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  email       String   @unique
+  password    String
+  initials    String?
+  avatarColor String   @default("#6B7280")
+  role        Role     @default(MEMBER)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  projectMembers  ProjectMember[]
+  jobAssignees    JobAssignee[]
+  comments        Comment[]
+  attachments     Attachment[]
+  notifications   Notification[]
+  createdProjects Project[]       @relation("CreatedProjects")
+  createdJobs     Job[]           @relation("CreatedJobs")
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+  GUEST
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  color       String   @default("#6B7280")
+  icon        String?
+  status      String?
+  isStarred   Boolean  @default(false)
+  position    Int      @default(0)
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace    Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy    User?                   @relation("CreatedProjects", fields: [createdById], references: [id])
+  members      ProjectMember[]
+  sections     Section[]
+  customFields CustomFieldDefinition[]
+  messages     ProjectMessage[]
+  jobs         Job[]
+}
+
+model ProjectMember {
+  projectId String
+  userId    String
+  role      String @default("member")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, userId])
+}
+
+model Section {
+  id        String   @id @default(cuid())
+  projectId String
+  name      String
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  jobs    Job[]
+}
+
+model CustomFieldDefinition {
+  id         String          @id @default(cuid())
+  projectId  String
+  name       String
+  fieldType  CustomFieldType
+  position   Int             @default(0)
+  isRequired Boolean         @default(false)
+  createdAt  DateTime        @default(now())
+
+  project   Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  options   EnumOption[]
+  jobValues JobCustomFieldValue[]
+}
+
+enum CustomFieldType {
+  TEXT
+  NUMBER
+  ENUM
+  DATE
+  CHECKBOX
+  URL
+}
+
+model EnumOption {
+  id                String @id @default(cuid())
+  fieldDefinitionId String
+  name              String
+  color             String @default("#6B7280")
+  position          Int    @default(0)
+
+  fieldDefinition CustomFieldDefinition @relation(fields: [fieldDefinitionId], references: [id], onDelete: Cascade)
+  jobValues       JobCustomFieldValue[]
+}
+
+model Job {
+  id          String    @id @default(cuid())
+  projectId   String
+  sectionId   String?
+  parentJobId String?
+  name        String
+  description String?
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+  dueDate     DateTime?
+  position    Int       @default(0)
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  project           Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  section           Section?              @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  parentJob         Job?                  @relation("Subtasks", fields: [parentJobId], references: [id], onDelete: Cascade)
+  subtasks          Job[]                 @relation("Subtasks")
+  createdBy         User?                 @relation("CreatedJobs", fields: [createdById], references: [id])
+  assignees         JobAssignee[]
+  customFieldValues JobCustomFieldValue[]
+  comments          Comment[]
+  attachments       Attachment[]
+  notifications     Notification[]
+  dependsOn         JobDependency[]       @relation("DependsOn")
+  dependedBy        JobDependency[]       @relation("DependedBy")
+}
+
+model JobAssignee {
+  jobId      String
+  userId     String
+  assignedAt DateTime @default(now())
+
+  job  Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([jobId, userId])
+}
+
+model JobDependency {
+  jobId          String
+  dependsOnJobId String
+
+  job       Job @relation("DependsOn", fields: [jobId], references: [id], onDelete: Cascade)
+  dependsOn Job @relation("DependedBy", fields: [dependsOnJobId], references: [id], onDelete: Cascade)
+
+  @@id([jobId, dependsOnJobId])
+}
+
+model JobCustomFieldValue {
+  id                String    @id @default(cuid())
+  jobId             String
+  fieldDefinitionId String
+  textValue         String?
+  numberValue       Float?
+  dateValue         DateTime?
+  booleanValue      Boolean?
+  enumOptionId      String?
+
+  job             Job                   @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  fieldDefinition CustomFieldDefinition @relation(fields: [fieldDefinitionId], references: [id], onDelete: Cascade)
+  enumOption      EnumOption?           @relation(fields: [enumOptionId], references: [id], onDelete: SetNull)
+
+  @@unique([jobId, fieldDefinitionId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  jobId     String
+  authorId  String
+  content   String
+  isPinned  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  job         Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  author      User         @relation(fields: [authorId], references: [id])
+  attachments Attachment[]
+}
+
+model Attachment {
+  id           String   @id @default(cuid())
+  jobId        String?
+  commentId    String?
+  uploadedById String?
+  fileName     String
+  fileUrl      String
+  fileSize     Int?
+  mimeType     String?
+  createdAt    DateTime @default(now())
+
+  job        Job?     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  comment    Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  uploadedBy User?    @relation(fields: [uploadedById], references: [id])
+}
+
+model ProjectMessage {
+  id        String   @id @default(cuid())
+  projectId String
+  authorId  String?
+  title     String?
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  jobId     String?
+  message   String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job  Job? @relation(fields: [jobId], references: [id], onDelete: Cascade)
+}
